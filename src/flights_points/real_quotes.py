@@ -1,9 +1,10 @@
 """
-Real points/miles lookup by querying provider sites (aa.com, Chase, United).
+Real points/miles lookup by querying provider sites and seats.aero.
 
-When available, returns actual award costs for a route+date instead of
-valuation-based estimates. Requires optional dependency 'playwright' for
-all three; set FLIGHTS_POINTS_DISABLE_*_SCRAPE=1 to disable per provider.
+When available, returns actual award costs for a route+date. Data sources:
+- seats.aero (optional): set SEATS_AERO_API_KEY for American + United from Cached Search API.
+- Browser scrapers (optional): install [scrape] + playwright for aa.com, united.com, Chase; set
+  FLIGHTS_POINTS_DISABLE_*_SCRAPE=1 to disable per provider.
 """
 
 from __future__ import annotations
@@ -51,6 +52,17 @@ FETCHERS = {
 }
 
 
+def _fetch_seats_aero(origin: str, destination: str, departure_date: str) -> dict[str, dict[str, Any]]:
+    """If SEATS_AERO_API_KEY is set, return american + united results from seats.aero Cached Search."""
+    if not os.environ.get("SEATS_AERO_API_KEY"):
+        return {}
+    try:
+        from .providers import seats_aero
+        return seats_aero.fetch_from_seats_aero(origin, destination, departure_date)
+    except Exception:
+        return {}
+
+
 def fetch_real_points_for_route(
     origin: str,
     destination: str,
@@ -59,7 +71,9 @@ def fetch_real_points_for_route(
     provider_ids: list[str] | None = None,
 ) -> dict[str, dict[str, Any]]:
     """
-    Query each provider's site for actual award points/miles on the given route and date.
+    Query seats.aero (if API key set) and/or each provider's site for actual award points/miles.
+    seats.aero fills American and United when SEATS_AERO_API_KEY is set; otherwise or on miss,
+    browser scrapers are used when [scrape] is installed. Chase is always from its scraper or estimate.
     Returns a dict keyed by provider id with 'points' (list of int or None), 'source', and optional 'error'.
     """
     origin = origin.strip().upper()
@@ -68,8 +82,18 @@ def fetch_real_points_for_route(
         return {}
     providers = provider_ids or list(FETCHERS)
     results = {}
+
+    # Prefer seats.aero for American and United when API key is set
+    seats_data = _fetch_seats_aero(origin, destination, departure_date)
+    for pid in ("american", "united"):
+        if pid in providers and pid in seats_data and seats_data[pid].get("points"):
+            results[pid] = seats_data[pid]
+
     for pid in providers:
         if pid not in FETCHERS:
+            continue
+        # Already have real data from seats.aero for this provider
+        if results.get(pid) and results[pid].get("points"):
             continue
         try:
             out = FETCHERS[pid](origin, destination, departure_date, adults)

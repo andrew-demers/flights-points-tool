@@ -8,7 +8,9 @@ __pycache__/
 .venv/
 venv/
 env/
+.env
 .env/
+.env.local
 
 # Build / install
 build/

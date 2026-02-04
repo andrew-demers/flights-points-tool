@@ -21,7 +21,7 @@ Use `list_point_providers` to see the full bands and notes.
 
 ## Tools
 
-- **`get_real_points_for_route(origin, destination, departure_date, adults?, price?, providers?)`** — **Query provider sites** (aa.com, Chase, United) for **actual** award points/miles on that route and date. When a site is queried successfully you see real costs; otherwise you get a valuation-based estimate if you pass an optional cash `price`. All three use the optional `[scrape]` dependency (see below). Chase Travel may require sign-in and can return a message to that effect.
+- **`get_real_points_for_route(origin, destination, departure_date, adults?, price?, providers?)`** — **Query seats.aero and/or provider sites** for **actual** award points/miles. When **seats.aero** is configured (see below), American and United come from its Cached Search API (no browser). Otherwise or on cache miss, optional browser scrapers (aa.com, united.com, Chase) are used if `[scrape]` is installed. Chase is always from its scraper or valuation; it may require sign-in.
 - **`get_points_equivalent(price, providers?)`** — Convert a **cash price** to a points range and typical value (valuation-based). Price can be `"$299"` or `299`.
 - **`get_points_for_multiple_prices(prices, providers?)`** — Same for a list of prices (e.g. from Flights MCP cheapest/best results).
 - **`list_point_providers()`** — List programs and their min–typical–max valuation (cents per point).
@@ -36,7 +36,15 @@ uv sync
 # or: pip install -e .
 ```
 
-**Real lookups (American, United, Chase):** To fetch actual points/miles from aa.com, united.com, and Chase Travel, install the optional scrape dependency and Playwright’s browser:
+**Real lookups — seats.aero (recommended for American & United):** No browser needed. Set your [seats.aero](https://seats.aero) Pro API key so American and United award miles come from their Cached Search API:
+
+```bash
+export SEATS_AERO_API_KEY="your-api-key"
+```
+
+Get an API key from [seats.aero](https://seats.aero) → Settings → API (Pro account required; see [their API docs](https://developers.seats.aero/) and [usage limits](https://docs.seats.aero/article/68-do-you-have-an-api)). If the key is set, `get_real_points_for_route` uses seats.aero first for American and United; if there’s no cached data or the key is missing, it falls back to browser scrapers when installed.
+
+**Real lookups — browser scrapers (optional):** To also fetch from aa.com, united.com, and Chase Travel (or when not using seats.aero), install the optional scrape dependency and Playwright:
 
 ```bash
 uv sync --extra scrape
@@ -109,17 +117,17 @@ Replace `/Users/huxley-47/dev/flights-points-tool` with the absolute path to thi
 
 1. User: “Cheapest flights JFK to LAX next Friday, and how many points?”
 2. Agent calls Flights MCP: `get_cheapest_flights(origin="JFK", destination="LAX", departure_date="2026-02-13")` → gets list of flights with prices like `"$299"`, `"$312"`, …
-3. **Real lookups:** Agent calls `get_real_points_for_route(origin="JFK", destination="LAX", departure_date="2026-02-13", price=299)` → gets actual miles/points from aa.com, united.com, and Chase Travel when scrape is enabled (Chase may require sign-in). **Or** use `get_points_equivalent(price="$299")` for valuation-only.
+3. **Real lookups:** Agent calls `get_real_points_for_route(origin="JFK", destination="LAX", departure_date="2026-02-13", price=299)` → gets American and United from **seats.aero** when `SEATS_AERO_API_KEY` is set, and/or from aa.com/united.com/Chase when browser scrape is enabled. **Or** use `get_points_equivalent(price="$299")` for valuation-only.
 4. Agent responds with flight options and points for each.
 
 ## Development
 
 - Valuations: `src/flights_points/valuations.py`
-- Real quote fetchers: `src/flights_points/real_quotes.py`, `src/flights_points/providers/` (American: `american.py`, United: `united.py`, Chase: `chase.py`, all via Playwright)
+- Real quote fetchers: `src/flights_points/real_quotes.py`, `src/flights_points/providers/` (seats.aero: `seats_aero.py`; American: `american.py`, United: `united.py`, Chase: `chase.py` via Playwright)
 - MCP tools: `src/flights_points/mcp_server.py`
 - Run server locally (stdio): `python -m flights_points.mcp_server`
 
-**Note:** Real lookups use browser automation (Playwright). Chase Travel often requires sign-in, so that scraper may return a message instead of points. Site changes can break selectors; report issues if a provider stops returning results.
+**Note:** With **seats.aero** you get American and United without a browser. Browser scrapers (Playwright) are used when seats.aero isn’t configured or has no data. Chase is only via its scraper or valuation and often requires sign-in. If the seats.aero API response shape changes, `providers/seats_aero.py` may need updates (see [developers.seats.aero](https://developers.seats.aero/reference)).
 
 ## License
 
