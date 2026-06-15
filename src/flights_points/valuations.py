@@ -36,6 +36,14 @@ POINT_PROVIDERS = {
         "cents_per_point_max": 1.5,
         "notes": "Value varies by award availability and Star Alliance partners.",
     },
+    "delta": {
+        "name": "Delta SkyMiles",
+        "unit": "miles",
+        "cents_per_point_min": 0.9,   # dynamic pricing; poor redemptions common
+        "cents_per_point_typical": 1.2,
+        "cents_per_point_max": 1.5,   # business class or flash sales
+        "notes": "No fixed award chart; dynamic pricing. Value varies widely by route and cabin.",
+    },
 }
 
 

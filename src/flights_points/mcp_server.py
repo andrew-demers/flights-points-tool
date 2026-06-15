@@ -19,7 +19,7 @@ from fastmcp import FastMCP
 
 mcp = FastMCP(
     "flights-points",
-    instructions="Convert flight prices to points/miles for Chase, American, and United. Use with Google Flights MCP: get flight options from Flights MCP, then call these tools for points equivalents.",
+    instructions="Convert flight prices to points/miles for Chase, American, United, and Delta. Use with Google Flights MCP: get flight options from Flights MCP, then call these tools for points equivalents.",
 )
 
 
@@ -48,17 +48,17 @@ def get_points_equivalent(
     providers: str | None = None,
 ) -> str:
     """
-    Convert a flight price to the approximate points or miles needed for Chase, American, and United.
+    Convert a flight price to the approximate points or miles needed for Chase, American, United, and Delta.
     Returns a *range* for each program (points path style): points update as price changes, and
-    programs like American don't use a fixed points-per-dollar, so you get min–max and a typical value.
+    programs like American and Delta don't use a fixed points-per-dollar, so you get min–max and a typical value.
 
     Use this after getting flight options from the Google Flights MCP: take the price from any
     flight (e.g. "$299" or 299) and get the points equivalent for each program.
 
     Args:
         price: Flight price in USD. Can be a number (e.g. 299) or a string like "$299" or "$1,234".
-        providers: Optional comma-separated list to limit results. Options: chase, american, united.
-                   Default is all three.
+        providers: Optional comma-separated list to limit results. Options: chase, american, united, delta.
+                   Default is all four.
 
     Returns:
         A formatted table with points range, typical value, and valuation band for each provider.
@@ -72,7 +72,7 @@ def get_points_equivalent(
         provider_list = [p.strip().lower() for p in providers.split(",") if p.strip()]
         invalid = [p for p in provider_list if p not in POINT_PROVIDERS]
         if invalid:
-            return f"Unknown provider(s): {', '.join(invalid)}. Use: chase, american, united."
+            return f"Unknown provider(s): {', '.join(invalid)}. Use: chase, american, united, delta."
 
     conversions = usd_to_all_providers(price_usd, provider_list)
     if not conversions:
@@ -94,7 +94,7 @@ def get_points_for_multiple_prices(
 
     Args:
         prices: List of flight prices in USD (e.g. [299, "$450", "$1,234.56"]).
-        providers: Optional comma-separated list: chase, american, united. Default is all.
+        providers: Optional comma-separated list: chase, american, united, delta. Default is all.
 
     Returns:
         A formatted section per valid price with points for each provider.
@@ -104,7 +104,7 @@ def get_points_for_multiple_prices(
         provider_list = [p.strip().lower() for p in providers.split(",") if p.strip()]
         invalid = [p for p in provider_list if p not in POINT_PROVIDERS]
         if invalid:
-            return f"Unknown provider(s): {', '.join(invalid)}. Use: chase, american, united."
+            return f"Unknown provider(s): {', '.join(invalid)}. Use: chase, american, united, delta."
 
     sections = []
     for i, price in enumerate(prices):
@@ -162,7 +162,7 @@ def get_real_points_for_route(
     providers: str | None = None,
 ) -> str:
     """
-    Get actual points/miles for a route and date by querying Chase, American (aa.com), and United.
+    Get actual points/miles for a route and date by querying Chase, American (aa.com), United, and Delta (delta.com).
 
     Calls each provider's site when the optional [scrape] dependency (playwright) is installed.
     Chase Travel may require sign-in and can return a message instead of points. If a provider
@@ -177,8 +177,8 @@ def get_real_points_for_route(
         departure_date: Departure date YYYY-MM-DD.
         adults: Number of adults (default 1).
         price: Optional cash price in USD (e.g. 299 or "$299"). If provided, used as fallback
-               estimate for providers that don't support real-time lookup (Chase, United).
-        providers: Optional comma-separated list: chase, american, united. Default all.
+               estimate for providers that don't support real-time lookup (Chase, United, Delta).
+        providers: Optional comma-separated list: chase, american, united, delta. Default all.
 
     Returns:
         Table of real points (from provider sites) or estimates per program.
@@ -196,7 +196,7 @@ def get_real_points_for_route(
         provider_list = [p.strip().lower() for p in providers.split(",") if p.strip()]
         invalid = [p for p in provider_list if p not in POINT_PROVIDERS]
         if invalid:
-            return f"Unknown provider(s): {', '.join(invalid)}. Use: chase, american, united."
+            return f"Unknown provider(s): {', '.join(invalid)}. Use: chase, american, united, delta."
 
     real_results = fetch_real_points_for_route(
         origin, destination, departure_date, adults=adults, provider_ids=provider_list

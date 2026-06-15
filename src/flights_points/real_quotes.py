@@ -45,15 +45,26 @@ def _fetch_united(origin: str, destination: str, departure_date: str, adults: in
         return None
 
 
+def _fetch_delta(origin: str, destination: str, departure_date: str, adults: int = 1) -> dict[str, Any] | None:
+    if os.environ.get("FLIGHTS_POINTS_DISABLE_DELTA_SCRAPE", "").lower() in ("1", "true", "yes"):
+        return None
+    try:
+        from .providers import delta
+        return delta.fetch_award_miles(origin, destination, departure_date, adults)
+    except Exception:
+        return None
+
+
 FETCHERS = {
     "american": _fetch_american,
     "chase": _fetch_chase,
     "united": _fetch_united,
+    "delta": _fetch_delta,
 }
 
 
 def _fetch_seats_aero(origin: str, destination: str, departure_date: str) -> dict[str, dict[str, Any]]:
-    """If SEATS_AERO_API_KEY is set, return american + united results from seats.aero Cached Search."""
+    """If SEATS_AERO_API_KEY is set, return american + united + delta results from seats.aero Cached Search."""
     if not os.environ.get("SEATS_AERO_API_KEY"):
         return {}
     try:
@@ -83,9 +94,9 @@ def fetch_real_points_for_route(
     providers = provider_ids or list(FETCHERS)
     results = {}
 
-    # Prefer seats.aero for American and United when API key is set
+    # Prefer seats.aero for American, United, and Delta when API key is set
     seats_data = _fetch_seats_aero(origin, destination, departure_date)
-    for pid in ("american", "united"):
+    for pid in ("american", "united", "delta"):
         if pid in providers and pid in seats_data and seats_data[pid].get("points"):
             results[pid] = seats_data[pid]
 

@@ -22,6 +22,9 @@ PROGRAM_MAP = {
     "mileageplus": "united",
     "united": "united",
     "ua": "united",
+    "skymiles": "delta",
+    "delta": "delta",
+    "dl": "delta",
 }
 
 
@@ -50,7 +53,7 @@ def _extract_miles_from_response(data: Any) -> dict[str, list[int]]:
             miles = item.get("miles") or item.get("points") or item.get("cost") or item.get("mileageCost")
             if miles is not None and program is not None:
                 pid = _normalize_program(str(program))
-                if pid and pid in ("american", "united"):
+                if pid and pid in ("american", "united", "delta"):
                     try:
                         m = int(miles)
                         if 1_000 <= m <= 500_000:
@@ -65,7 +68,7 @@ def _extract_miles_from_response(data: Any) -> dict[str, list[int]]:
                 miles = item.get("miles") or item.get("points") or item.get("cost")
                 if miles is not None and program is not None:
                     pid = _normalize_program(str(program))
-                    if pid and pid in ("american", "united"):
+                    if pid and pid in ("american", "united", "delta"):
                         try:
                             m = int(miles)
                             if 1_000 <= m <= 500_000:
@@ -124,16 +127,18 @@ def fetch_from_seats_aero(
         return {
             "american": {"source": "seats.aero", "points": None, "error": f"seats.aero API error {e.code}: {err_body[:200]}"},
             "united": {"source": "seats.aero", "points": None, "error": f"seats.aero API error {e.code}"},
+            "delta": {"source": "seats.aero", "points": None, "error": f"seats.aero API error {e.code}"},
         }
     except (urllib.error.URLError, json.JSONDecodeError, OSError) as e:
         return {
             "american": {"source": "seats.aero", "points": None, "error": str(e)},
             "united": {"source": "seats.aero", "points": None, "error": str(e)},
+            "delta": {"source": "seats.aero", "points": None, "error": str(e)},
         }
 
     by_provider = _extract_miles_from_response(data)
     results = {}
-    for pid in ("american", "united"):
+    for pid in ("american", "united", "delta"):
         if by_provider.get(pid):
             results[pid] = {"source": "seats.aero", "points": by_provider[pid], "error": None}
         else:
