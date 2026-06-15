@@ -60,6 +60,33 @@ Optional: disable individual scrapers via env (e.g. in CI or to avoid browser us
 - `FLIGHTS_POINTS_DISABLE_DELTA_SCRAPE=1` — Delta (delta.com)
 - `FLIGHTS_POINTS_DISABLE_CHASE_SCRAPE=1` — Chase Travel (chase.com/travel; often requires sign-in)
 
+### Run with Claude Code
+
+Add to `~/.claude/settings.json` (global, available in every session) or `.claude/settings.json` in this repo (project-local):
+
+```json
+{
+  "mcpServers": {
+    "flights-points": {
+      "command": "uv",
+      "args": [
+        "--directory",
+        "/path/to/flights-points-tool",
+        "run",
+        "python",
+        "-m",
+        "flights_points.mcp_server"
+      ],
+      "env": {
+        "SEATS_AERO_API_KEY": "your-key-here"
+      }
+    }
+  }
+}
+```
+
+Replace `/path/to/flights-points-tool` with the absolute path to this repo. The `env` map is optional — if omitted, the server inherits your shell environment (so `SEATS_AERO_API_KEY` must be exported there instead). Restart Claude Code after editing.
+
 ### Run with Cursor
 
 1. **Project MCP**: Create or edit `.cursor/mcp.json` in this repo (or your project that uses it):
@@ -71,18 +98,21 @@ Optional: disable individual scrapers via env (e.g. in CI or to avoid browser us
       "command": "uv",
       "args": [
         "--directory",
-        "/Users/andrew/dev/flights-points-tool",
+        "/path/to/flights-points-tool",
         "run",
         "python",
         "-m",
         "flights_points.mcp_server"
-      ]
+      ],
+      "env": {
+        "SEATS_AERO_API_KEY": "your-key-here"
+      }
     }
   }
 }
 ```
 
-Replace `/Users/andrew/dev/flights-points-tool` with the absolute path to this repo. If `uv` is not on your PATH, use the full path to `uv` (e.g. from `which uv`) in `"command"`.
+Replace `/path/to/flights-points-tool` with the absolute path to this repo. If `uv` is not on your PATH, use the full path to `uv` (e.g. from `which uv`) in `"command"`.
 
 2. **With Google Flights MCP**: Add the Flights MCP in the same `mcp.json` so the agent can both search flights and get points:
 
