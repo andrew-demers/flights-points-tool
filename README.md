@@ -62,30 +62,17 @@ Optional: disable individual scrapers via env (e.g. in CI or to avoid browser us
 
 ### Run with Claude Code
 
-Add to `~/.claude/settings.json` (global, available in every session) or `.claude/settings.json` in this repo (project-local):
+Use `claude mcp add` to register the server globally (available in every session):
 
-```json
-{
-  "mcpServers": {
-    "flights-points": {
-      "command": "uv",
-      "args": [
-        "--directory",
-        "/path/to/flights-points-tool",
-        "run",
-        "python",
-        "-m",
-        "flights_points.mcp_server"
-      ],
-      "env": {
-        "SEATS_AERO_API_KEY": "your-key-here"
-      }
-    }
-  }
-}
+```bash
+claude mcp add flights-points --scope user \
+  -e SEATS_AERO_API_KEY=your-key-here \
+  -- uv --directory /path/to/flights-points-tool run python -m flights_points.mcp_server
 ```
 
-Replace `/path/to/flights-points-tool` with the absolute path to this repo. The `env` map is optional — if omitted, the server inherits your shell environment (so `SEATS_AERO_API_KEY` must be exported there instead). Restart Claude Code after editing.
+Replace `/path/to/flights-points-tool` with the absolute path to this repo. The `-e` flag is optional — omit it if `SEATS_AERO_API_KEY` is already in your shell environment. Restart Claude Code after adding.
+
+To verify it's registered: `claude mcp list`
 
 ### Run with Cursor
 
