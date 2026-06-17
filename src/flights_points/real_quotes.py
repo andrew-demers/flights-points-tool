@@ -1,10 +1,10 @@
 """
-Real points/miles lookup by querying provider sites and seats.aero.
+Real points/miles lookup by querying seats.aero (preferred) or provider sites via Playwright.
 
-When available, returns actual award costs for a route+date. Data sources:
-- seats.aero (optional): set SEATS_AERO_API_KEY for American + United from Cached Search API.
-- Browser scrapers (optional): install [scrape] + playwright for aa.com, united.com, Chase; set
-  FLIGHTS_POINTS_DISABLE_*_SCRAPE=1 to disable per provider.
+Data sources:
+- seats.aero (preferred): set SEATS_AERO_API_KEY for American, United, and Delta.
+- Browser scrapers (fallback): install [scrape] + playwright for aa.com, united.com, delta.com, Chase.
+  Set FLIGHTS_POINTS_DISABLE_*_SCRAPE=1 to disable per provider.
 """
 
 from __future__ import annotations
@@ -12,7 +12,7 @@ from __future__ import annotations
 import os
 from typing import Any
 
-from .valuations import POINT_PROVIDERS, usd_to_all_providers
+PROVIDERS = ("american", "united", "delta", "chase")
 
 
 def _fetch_american(origin: str, destination: str, departure_date: str, adults: int = 1) -> dict[str, Any] | None:
@@ -27,12 +27,12 @@ def _fetch_american(origin: str, destination: str, departure_date: str, adults: 
 
 def _fetch_chase(origin: str, destination: str, departure_date: str, adults: int = 1) -> dict[str, Any] | None:
     if os.environ.get("FLIGHTS_POINTS_DISABLE_CHASE_SCRAPE", "").lower() in ("1", "true", "yes"):
-        return {"source": "chase.com", "points": None, "error": "Chase scrape disabled by FLIGHTS_POINTS_DISABLE_CHASE_SCRAPE."}
+        return {"source": "chase.com", "points": None, "error": "Chase scrape disabled."}
     try:
         from .providers import chase
         return chase.fetch_award_points(origin, destination, departure_date, adults)
     except Exception:
-        return {"source": "chase.com", "points": None, "error": "Chase Travel lookup failed (install [scrape] and playwright?)."}
+        return {"source": "chase.com", "points": None, "error": "Chase lookup failed (install [scrape] and playwright?)."}
 
 
 def _fetch_united(origin: str, destination: str, departure_date: str, adults: int = 1) -> dict[str, Any] | None:
@@ -55,7 +55,7 @@ def _fetch_delta(origin: str, destination: str, departure_date: str, adults: int
         return None
 
 
-FETCHERS = {
+_SCRAPERS = {
     "american": _fetch_american,
     "chase": _fetch_chase,
     "united": _fetch_united,
@@ -64,7 +64,6 @@ FETCHERS = {
 
 
 def _fetch_seats_aero(origin: str, destination: str, departure_date: str) -> dict[str, dict[str, Any]]:
-    """If SEATS_AERO_API_KEY is set, return american + united + delta results from seats.aero Cached Search."""
     if not os.environ.get("SEATS_AERO_API_KEY"):
         return {}
     try:
@@ -83,81 +82,30 @@ def fetch_real_points_for_route(
 ) -> dict[str, dict[str, Any]]:
     """
     Query seats.aero (if API key set) and/or each provider's site for actual award points/miles.
-    seats.aero fills American and United when SEATS_AERO_API_KEY is set; otherwise or on miss,
-    browser scrapers are used when [scrape] is installed. Chase is always from its scraper or estimate.
-    Returns a dict keyed by provider id with 'points' (list of int or None), 'source', and optional 'error'.
+    Returns a dict keyed by provider id with 'points' (list of int or None), 'source', and 'error'.
+    No estimate fallback — only real data from seats.aero or scrapers.
     """
     origin = origin.strip().upper()
     destination = destination.strip().upper()
     if len(origin) != 3 or len(destination) != 3:
         return {}
-    providers = provider_ids or list(FETCHERS)
-    results = {}
+    providers = provider_ids or list(PROVIDERS)
+    results: dict[str, dict[str, Any]] = {}
 
-    # Prefer seats.aero for American, United, and Delta when API key is set
+    # seats.aero covers american, united, delta — prefer it when key is set
     seats_data = _fetch_seats_aero(origin, destination, departure_date)
     for pid in ("american", "united", "delta"):
-        if pid in providers and pid in seats_data and seats_data[pid].get("points"):
+        if pid in providers and seats_data.get(pid, {}).get("points"):
             results[pid] = seats_data[pid]
 
+    # Fall back to scrapers for any provider without data yet
     for pid in providers:
-        if pid not in FETCHERS:
+        if pid not in _SCRAPERS:
             continue
-        # Already have real data from seats.aero for this provider
-        if results.get(pid) and results[pid].get("points"):
+        if results.get(pid, {}).get("points"):
             continue
-        try:
-            out = FETCHERS[pid](origin, destination, departure_date, adults)
-            if out is not None:
-                results[pid] = out
-        except Exception as e:
-            results[pid] = {"source": pid, "points": None, "error": str(e)}
+        out = _SCRAPERS[pid](origin, destination, departure_date, adults)
+        if out is not None:
+            results[pid] = out
+
     return results
-
-
-def merge_real_with_estimate(
-    real_results: dict[str, dict[str, Any]],
-    price_usd: float | None,
-    provider_ids: list[str] | None = None,
-) -> list[dict[str, Any]]:
-    """
-    Build a unified view: use real points when available, otherwise valuation-based estimate if price_usd given.
-    real_results: from fetch_real_points_for_route().
-    price_usd: if provided, used for estimate fallback for providers with no real data.
-    provider_ids: if provided, only include these providers.
-    """
-    providers = provider_ids or list(POINT_PROVIDERS)
-    merged = []
-    for pid in providers:
-        meta = POINT_PROVIDERS.get(pid)
-        if not meta:
-            continue
-        name = meta["name"]
-        unit = meta["unit"]
-        entry = {"provider": pid, "name": name, "unit": unit}
-        real = real_results.get(pid)
-        if real and real.get("points"):
-            pts = real["points"]
-            entry["source"] = "real"
-            entry["points_list"] = pts
-            entry["points_min"] = min(pts)
-            entry["points_max"] = max(pts)
-            entry["points_typical"] = round(sum(pts) / len(pts))
-            entry["site"] = real.get("source", pid)
-        elif price_usd is not None and price_usd > 0:
-            conv = usd_to_all_providers(price_usd, [pid])
-            if conv:
-                c = conv[0]
-                entry["source"] = "estimate"
-                entry["points_min"] = c["points_min"]
-                entry["points_max"] = c["points_max"]
-                entry["points_typical"] = c["points_typical"]
-                entry["site"] = "valuation (no real lookup)"
-            else:
-                entry["source"] = "unavailable"
-                entry["error"] = real.get("error", "No data") if real else "Not queried"
-        else:
-            entry["source"] = "unavailable"
-            entry["error"] = real.get("error", "No data") if real else "Not queried"
-        merged.append(entry)
-    return merged
