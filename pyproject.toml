@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
     "fastmcp>=2.0.0",
+    "truststore>=0.10.4",
 ]
 
 [project.optional-dependencies]
