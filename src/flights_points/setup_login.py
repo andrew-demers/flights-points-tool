@@ -30,7 +30,17 @@ def setup_seats_aero_session(session_path: pathlib.Path = _SESSION_FILE) -> None
     print()
 
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=False, slow_mo=50)
+        try:
+            browser = p.chromium.launch(
+                channel="chrome",
+                headless=False,
+                args=["--disable-blink-features=AutomationControlled"],
+            )
+        except Exception:
+            browser = p.chromium.launch(
+                headless=False,
+                args=["--disable-blink-features=AutomationControlled"],
+            )
         context = browser.new_context(
             viewport={"width": 1280, "height": 900},
             user_agent=(
@@ -39,27 +49,33 @@ def setup_seats_aero_session(session_path: pathlib.Path = _SESSION_FILE) -> None
                 "Chrome/124.0.0.0 Safari/537.36"
             ),
         )
+        # Remove navigator.webdriver property that triggers bot detection
+        context.add_init_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
         page = context.new_page()
         page.goto("https://seats.aero/login", wait_until="domcontentloaded")
 
-        print("Waiting for you to log in... (3 minute timeout)")
+        print("Once logged in, press Enter here to save the session.")
+        print("(Or wait — auto-detection will save it within 3 minutes)")
+        print()
+
+        import threading
+        save_now = threading.Event()
+        def _wait_for_enter():
+            input()
+            save_now.set()
+        t = threading.Thread(target=_wait_for_enter, daemon=True)
+        t.start()
+
         deadline = time.time() + 180
-        logged_in = False
         while time.time() < deadline:
+            if save_now.is_set():
+                break
             url = page.url
-            if "seats.aero" in url and "login" not in url and "signin" not in url:
-                content = page.content().lower()
-                if "sign in" not in content or "password" not in content:
-                    logged_in = True
-                    break
-            time.sleep(2)
+            if "seats.aero" in url and "accounts.google.com" not in url and "login" not in url:
+                break
+            time.sleep(1)
 
-        if not logged_in:
-            print("Timed out waiting for login.")
-            browser.close()
-            sys.exit(1)
-
-        print("Login detected! Saving session...")
+        print("Saving session...")
         session_path.parent.mkdir(parents=True, exist_ok=True)
         storage = context.storage_state()
         session_path.write_text(json.dumps(storage, indent=2))

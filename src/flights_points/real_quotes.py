@@ -26,6 +26,14 @@ def _fetch_seats_aero(origin: str, destination: str, departure_date: str) -> dic
 
 
 def _fetch_seats_aero_browser(origin: str, destination: str, departure_date: str) -> dict[str, dict[str, Any]]:
+    # Only run if a saved session exists - don't open a login prompt from MCP context
+    import pathlib
+    session_file = pathlib.Path.home() / ".config" / "flights-points" / "seats_aero_session.json"
+    custom = os.environ.get("SEATS_AERO_SESSION_FILE", "").strip()
+    if custom:
+        session_file = pathlib.Path(custom)
+    if not session_file.exists():
+        return {}
     try:
         from .providers import seats_aero_browser
         return seats_aero_browser.fetch_from_seats_aero_browser(origin, destination, departure_date)
@@ -37,7 +45,7 @@ def fetch_real_points_for_route(
     origin: str,
     destination: str,
     departure_date: str,
-    adults: int = 1,  # noqa: ARG001 - kept for API compatibility
+    adults: int = 1,
     provider_ids: list[str] | None = None,
 ) -> dict[str, dict[str, Any]]:
     """
@@ -49,6 +57,7 @@ def fetch_real_points_for_route(
     destination = destination.strip().upper()
     if len(origin) != 3 or len(destination) != 3:
         return {}
+    del adults  # seats.aero API doesn't filter by passenger count at search time
     providers = provider_ids or list(PROVIDERS)
     results: dict[str, dict[str, Any]] = {}
 

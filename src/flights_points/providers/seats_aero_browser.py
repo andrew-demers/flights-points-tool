@@ -145,7 +145,11 @@ def fetch_from_seats_aero_browser(
     session_path = _session_file()
 
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=headless, slow_mo=80)
+        launch_args = ["--disable-blink-features=AutomationControlled"]
+        try:
+            browser = p.chromium.launch(channel="chrome", headless=headless, slow_mo=80, args=launch_args)
+        except Exception:
+            browser = p.chromium.launch(headless=headless, slow_mo=80, args=launch_args)
         context = browser.new_context(
             viewport={"width": 1280, "height": 900},
             user_agent=(
@@ -154,6 +158,7 @@ def fetch_from_seats_aero_browser(
                 "Chrome/124.0.0.0 Safari/537.36"
             ),
         )
+        context.add_init_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
 
         loaded = _load_session(context, session_path)
         page = context.new_page()

@@ -2,7 +2,7 @@
 
 MCP server that looks up **real award availability** (points/miles) for flights via **seats.aero** or airline sites directly. Use it alongside the [Google Flights MCP](https://github.com/smamidipaka6/flights-mcp-server): search flights for cash prices, then call this server to see actual award costs.
 
-Supports **American AAdvantage**, **United MileagePlus**, and **Delta SkyMiles** via seats.aero (no browser needed when API key is set). Chase Ultimate Rewards is available via browser scraper.
+Supports **American AAdvantage**, **United MileagePlus**, and **Delta SkyMiles** via seats.aero (no browser needed when API key is set).
 
 ## Quick install
 
@@ -60,13 +60,17 @@ The skill searches all dates in parallel, combines cash prices (Google Flights M
 
 > **Coverage note:** seats.aero's API uses a cached search that only covers routes it actively monitors - primarily high-demand, high-volume routes. Thin or connecting-only routes (e.g. AUS-AUA, which has no nonstop) may return no results from the API even when seats are available. seats.aero's live search endpoint is not available to Pro API accounts (requires a partner agreement). For routes not in the cache, manual search on seats.aero or airline sites is required.
 
-**Browser scrapers (limited fallback)** - The codebase includes Playwright scrapers for AA, United, Delta, and Chase. In practice, major airline websites (AA, United, Delta) block headless browsers with bot protection and return "Access Denied." These scrapers are included for completeness but are unreliable for most routes. Chase requires sign-in and is also unavailable.
+**seats.aero browser scraper (session-based fallback)** - When the seats.aero API returns no results, the tool falls back to scraping seats.aero directly via a headed Playwright browser using a saved session. This covers thin routes that aren't in the API cache.
 
-Disable individual scrapers via env if needed:
-- `FLIGHTS_POINTS_DISABLE_AA_SCRAPE=1`
-- `FLIGHTS_POINTS_DISABLE_UNITED_SCRAPE=1`
-- `FLIGHTS_POINTS_DISABLE_DELTA_SCRAPE=1`
-- `FLIGHTS_POINTS_DISABLE_CHASE_SCRAPE=1`
+Run this once to set up your session (opens a browser window for you to log in):
+
+```bash
+uv run python -m flights_points.setup_login
+```
+
+Session is saved to `~/.config/flights-points/seats_aero_session.json`. The browser scraper launches automatically on subsequent MCP calls when the session file exists. Set `SEATS_AERO_SESSION_FILE=/custom/path.json` to use a different path.
+
+> **Note:** The browser scraper uses `--disable-blink-features=AutomationControlled` and hides `navigator.webdriver` to bypass basic bot detection on seats.aero. Direct scraping of AA.com, United.com, and Delta.com is not supported - those sites use Cloudflare and behavioral analysis that these flags don't defeat.
 
 ## Manual setup
 
