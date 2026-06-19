@@ -1,10 +1,11 @@
 """
-Real points/miles lookup by querying seats.aero (preferred) or provider sites via Playwright.
+Real points/miles lookup. Priority order per provider:
+1. seats.aero cached API (SEATS_AERO_API_KEY required) — fast, no browser.
+2. seats.aero browser scraper — headed Playwright, live search, covers thin/connecting routes.
+3. Individual airline sites (aa.com, united.com, delta.com) — headed Playwright fallback.
 
-Data sources:
-- seats.aero (preferred): set SEATS_AERO_API_KEY for American, United, and Delta.
-- Browser scrapers (fallback): install [scrape] + playwright for aa.com, united.com, delta.com, Chase.
-  Set FLIGHTS_POINTS_DISABLE_*_SCRAPE=1 to disable per provider.
+Set FLIGHTS_POINTS_HEADLESS=1 to force headless mode (disables #2 for unauth'd sessions).
+Set FLIGHTS_POINTS_DISABLE_*_SCRAPE=1 to skip individual airline scrapers.
 """
 
 from __future__ import annotations
@@ -73,6 +74,14 @@ def _fetch_seats_aero(origin: str, destination: str, departure_date: str) -> dic
         return {}
 
 
+def _fetch_seats_aero_browser(origin: str, destination: str, departure_date: str) -> dict[str, dict[str, Any]]:
+    try:
+        from .providers import seats_aero_browser
+        return seats_aero_browser.fetch_from_seats_aero_browser(origin, destination, departure_date)
+    except Exception:
+        return {}
+
+
 def fetch_real_points_for_route(
     origin: str,
     destination: str,
@@ -92,13 +101,21 @@ def fetch_real_points_for_route(
     providers = provider_ids or list(PROVIDERS)
     results: dict[str, dict[str, Any]] = {}
 
-    # seats.aero covers american, united, delta — prefer it when key is set
+    # 1. seats.aero cached API — fast, no browser, covers monitored routes
     seats_data = _fetch_seats_aero(origin, destination, departure_date)
     for pid in ("american", "united", "delta"):
         if pid in providers and seats_data.get(pid, {}).get("points"):
             results[pid] = seats_data[pid]
 
-    # Fall back to scrapers for any provider without data yet
+    # 2. seats.aero browser — live search via headed browser, covers thin/connecting routes
+    missing = [pid for pid in ("american", "united", "delta") if pid in providers and not results.get(pid, {}).get("points")]
+    if missing:
+        browser_data = _fetch_seats_aero_browser(origin, destination, departure_date)
+        for pid in missing:
+            if browser_data.get(pid, {}).get("points"):
+                results[pid] = browser_data[pid]
+
+    # 3. Individual airline sites — fallback for anything still missing
     for pid in providers:
         if pid not in _SCRAPERS:
             continue

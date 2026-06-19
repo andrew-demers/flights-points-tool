@@ -8,6 +8,7 @@ playwright install chromium. Set FLIGHTS_POINTS_DISABLE_AA_SCRAPE=1 to disable.
 
 from __future__ import annotations
 
+import os
 import re
 from typing import Any
 
@@ -35,8 +36,9 @@ def fetch_award_miles(
     if len(departure_date) != 10 or departure_date[4] != "-" or departure_date[7] != "-":
         return None
 
+    headless = os.environ.get("FLIGHTS_POINTS_HEADLESS", "").lower() in ("1", "true", "yes")
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
+        browser = p.chromium.launch(headless=headless, slow_mo=80)
         try:
             page = browser.new_page()
             page.set_default_timeout(25_000)

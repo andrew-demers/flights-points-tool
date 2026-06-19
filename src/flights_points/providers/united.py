@@ -8,6 +8,7 @@ playwright install chromium. Set FLIGHTS_POINTS_DISABLE_UNITED_SCRAPE=1 to disab
 
 from __future__ import annotations
 
+import os
 import re
 from typing import Any
 
@@ -59,8 +60,9 @@ def fetch_award_miles(
     month, day, year = departure_date[5:7], departure_date[8:10], departure_date[:4]
     date_us = f"{month}/{day}/{year}"
 
+    headless = os.environ.get("FLIGHTS_POINTS_HEADLESS", "").lower() in ("1", "true", "yes")
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
+        browser = p.chromium.launch(headless=headless, slow_mo=80)
         try:
             page = browser.new_page()
             page.set_default_timeout(25_000)
