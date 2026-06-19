@@ -18,7 +18,6 @@ _PROVIDER_NAMES = {
     "american": ("American AAdvantage", "miles"),
     "united": ("United MileagePlus", "miles"),
     "delta": ("Delta SkyMiles", "miles"),
-    "chase": ("Chase Ultimate Rewards", "points"),
 }
 
 
@@ -68,7 +67,7 @@ def get_real_points_for_route(
         destination: Destination airport IATA code (e.g. "LAX", "LHR").
         departure_date: Departure date YYYY-MM-DD.
         adults: Number of adults (default 1).
-        providers: Optional comma-separated list: american, united, delta, chase. Default all.
+        providers: Optional comma-separated list: american, united, delta. Default all.
 
     Returns:
         Table of award availability per program. No data = no availability found from any source.
