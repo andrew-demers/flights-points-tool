@@ -58,12 +58,16 @@ The skill searches all dates in parallel, combines cash prices (Google Flights M
 
 **seats.aero (recommended)** - Set `SEATS_AERO_API_KEY` to get American, United, and Delta award data without a browser. Get an API key at [seats.aero](https://seats.aero) (Pro account required). The install script wires this up automatically.
 
-**Browser scrapers (fallback)** - Used when seats.aero has no data or is not configured. Requires the `[scrape]` install option and Playwright:
+> **Coverage note:** seats.aero's API uses a cached search that only covers routes it actively monitors - primarily high-demand routes. Thin or connecting-only routes (e.g. AUS-AUA, which has no nonstop) may return no results from the API even when seats are available on the website. seats.aero's live search endpoint (which powers their website) is not available to Pro API accounts. For these routes, the browser scrapers are the reliable fallback.
+
+**Browser scrapers (fallback)** - Used when seats.aero has no data for a route or is not configured. Queries AA, United, and Delta directly. Requires the `[scrape]` install option and Playwright browsers:
 
 ```bash
 uv sync --extra scrape
 playwright install chromium
 ```
+
+If you see "No availability found" for a route you know has award seats, the browser scrapers are likely not installed. Run the two commands above and try again.
 
 Disable individual scrapers via env if needed:
 - `FLIGHTS_POINTS_DISABLE_AA_SCRAPE=1`
