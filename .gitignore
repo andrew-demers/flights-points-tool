@@ -24,6 +24,7 @@ dist/
 # IDE / editor
 .idea/
 .vscode/
+.cursor/
 *.swp
 *.swo
 
